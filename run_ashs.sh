@@ -1,27 +1,12 @@
 #!/bin/bash -e
 
-# Load some required modules
-module load ImageMagick/7.1.0
-module load fftw/3.3.8
-
-##############################################
-scriptPath=$(readlink -f "$0")
-scriptDir=$(dirname "${scriptPath}")
-
-# base dir under which we find code and atlases
-# This variable is used by ashs_main.sh
-export ASHS_ROOT="${scriptDir%pmacsASHS}ashs-2.0.0"
-
-atlasRoot="${scriptDir%pmacsASHS}atlases"
+module load ashs
 
 # Default atlases
-mtlT1wAtlas="${atlasRoot}/MTL_3TT1MRI_PMC_atlas"
-mtlT2wAtlas="${atlasRoot}/MTL_3TT2MRI_ABC_prisma_atlas"
+mtlT1wAtlas="${ASHS_ROOT}/atlases/MTL_3TT1MRI_PMC_atlas"
+mtlT2wAtlas="${ASHS_ROOT}/atlases/MTL_3TT2MRI_ABC_prisma_atlas"
 # ICV always done on T1w
-icvAtlas="${atlasRoot}/ICV_3TT1MRI_atlas"
-
-export PATH=$PATH:${ASHS_ROOT}/bin
-C3DPATH=${ASHS_ROOT}/ext/Linux/bin
+icvAtlas="${ASHS_ROOT}/atlases/ICV_3TT1MRI_atlas"
 
 if [[ ! -f "${ASHS_ROOT}/bin/ashs_main.sh" ]]; then
   echo "Cannot locate ASHS executables at ${ASHS_ROOT}/bin"
