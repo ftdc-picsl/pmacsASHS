@@ -15,6 +15,6 @@ website](https://sites.google.com/site/hipposubfields).
 For ASHS itself and the included 3T atlases:
 
 Yushkevich PA, Pluta J, Wang H, Ding SL, Xie L, Gertje E, Mancuso L, Kliot D, Das SR and
-Wolk DA, "Automated Volumetry and Regional Thickness Analysis of Hippocampal Subfields
-_and Medial Temporal Cortical Structures in Mild Cognitive Impairment", _Human Brain
-Mapping_, 2014, 36(1), 258-287. http://www.ncbi.nlm.nih.gov/pubmed/25181316
+Wolk DA, "Automated Volumetry and Regional Thickness Analysis of Hippocampal Subfields and
+Medial Temporal Cortical Structures in Mild Cognitive Impairment", _Human Brain Mapping_,
+2014, 36(1), 258-287. http://www.ncbi.nlm.nih.gov/pubmed/25181316
