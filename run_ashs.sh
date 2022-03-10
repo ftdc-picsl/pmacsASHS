@@ -120,12 +120,19 @@ function help()
 
     Referencing:
 
-    Please cite this paper in reference to ASHS software and the default atlases:
+    Please cite this paper in reference to ASHS software and the 3T T2w MTL atlas:
 
       Yushkevich PA, Pluta J, Wang H, Ding SL, Xie L, Gertje E, Mancuso L, Kliot D, Das SR and Wolk DA,
       \"Automated Volumetry and Regional Thickness Analysis of Hippocampal Subfields and Medial Temporal
       Cortical Structures in Mild Cognitive Impairment\", Human Brain Mapping, 2014, 36(1), 258-287.
       http://www.ncbi.nlm.nih.gov/pubmed/25181316
+
+      If using the T1w MTL atlas, please also cite
+
+      \"Xie L, Wisse LEM, Das SR, Wang H, Wolk DA, Manjón JV, et al. Accounting for the Confound of Meninges
+      in Segmenting Entorhinal and Perirhinal Cortices in T1-Weighted MRI\".
+      Med Image Comput Comput Assist Interv 2016;9901:564-71.
+      https://pubmed.ncbi.nlm.nih.gov/28752156/
 
 
     Further information:
@@ -353,7 +360,7 @@ Summarize
 echo "Step 3/3: Done!"
 
 if [[ $cleanup -gt 0 ]]; then
-  rm -f ${jobTmpDir}/MTLSeg ${jobTmpDir}/ICVSeg
+  rm -rf ${jobTmpDir}/MTLSeg ${jobTmpDir}/ICVSeg
   rmdir ${jobTmpDir}
 else
   echo "Not cleaning up working directory ${jobTmpDir}"
