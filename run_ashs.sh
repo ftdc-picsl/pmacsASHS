@@ -1,6 +1,10 @@
 #!/bin/bash -e
 
+module load c3d/20191022
 module load ashs
+
+scriptPath=$(readlink -e "$0")
+scriptDir=$(dirname "${scriptPath}")
 
 # Default atlases
 mtlT1wAtlas="${ASHS_ROOT}/atlases/MTL_3TT1MRI_PMC_atlas"
@@ -33,6 +37,9 @@ greedyThreads=1
 
 # cleanup tmp dir
 cleanup=1
+
+# trim neck
+trimNeck=1
 
 ##############################################
 
@@ -94,6 +101,8 @@ function help()
            automatically. Use this option to use a pre-defined transform instead. The transform should be computed
            with greedy, using the T2w as the fixed image and the T1w as the moving image.
 
+      -t : Trim neck from the input T1w image using the trim_neck.sh script (default = $trimNeck).
+
 
     Custom atlas options:
 
@@ -135,17 +144,18 @@ function options()
     exit 1
   fi
 
-  while getopts "I:M:T:c:f:g:l:m:o:h" opt; do
+  while getopts "I:M:T:c:f:g:l:m:o:t:h" opt; do
     case $opt in
-      F) mtlT2wAtlas=$OPTARG;;
-      G) mtlT1wAtlas=$OPTARG;;
-      I) icvAtlas=$OPTARG;;
+      F) mtlT2wAtlas=$(readlink -m "$OPTARG");;
+      G) mtlT1wAtlas=$(readlink -m "$OPTARG");;
+      I) icvAtlas=$(readlink -m "$OPTARG");;
       c) cleanup=$OPTARG;;
-      f) inputT2w=$OPTARG;;
-      g) inputT1w=$OPTARG;;
+      f) inputT2w=$(readlink -m "$OPTARG");;
+      g) inputT1w=$(readlink -m "$OPTARG");;
       l) submitToQueue=$OPTARG;;
-      m) inputTransform=$OPTARG;;
-      o) outputDir=$OPTARG;;
+      m) inputTransform=$(readlink -m "$OPTARG");;
+      o) outputDir=$(readlink -m "$OPTARG");;
+      t) trimNeck=$OPTARG;;
       h) help; exit 1;;
       \?) echo "Unknown option $OPTARG"; exit 2;;
       :) echo "Option $OPTARG requires an argument"; exit 2;;
@@ -171,7 +181,13 @@ function options()
   inputT1wBasename=$(basename "$inputT1w")
   inputT1wDirname=$(dirname "$inputT1w")
 
-  if [[ $inputT1wBasename =~ .nii(.gz)?$ ]]; then
+  # Trim neck can change input, so don't allow input directory to be output directory
+  if [[ "${outputDir}" -eq "${inputT1wDirname}" ]]; then
+    echo "Output directory cannot be the same as the input directory"
+    exit 1
+  fi
+
+  if [[ "$inputT1wBasename" =~ .nii(.gz)?$ ]]; then
     extension=${BASH_REMATCH[0]}
     inputT1wFileRoot=${inputT1wBasename%${extension}}
   else
@@ -182,7 +198,7 @@ function options()
   if [[ -f "$inputT2w" ]]; then
     inputT2wBasename=$(basename "$inputT2w")
     inputT2wDirname=$(dirname "$inputT2w")
-    if [[ $inputT2wBasename =~ .nii(.gz)?$ ]]; then
+    if [[ "$inputT2wBasename" =~ .nii(.gz)?$ ]]; then
       extension=${BASH_REMATCH[0]}
       inputT2wFileRoot=${inputT2wBasename%${extension}}
     else
@@ -298,10 +314,6 @@ export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=${LSB_DJOB_NUMPROC}
 
 # make output directory
 mkdir -p ${outputDir}
-cp $inputT1w ${outputDir}/${inputT1wBasename}
-if [[ -f ${inputT2w} ]]; then
-    cp $inputT2w ${outputDir}/${inputT2wBasename}
-fi
 
 # Make tmp directory
 jobTmpDir=$( mktemp -d -p /scratch ashs.${LSB_JOBID}.XXXXXXX.tmpdir )
@@ -310,6 +322,20 @@ if [[ ! -d "$jobTmpDir" ]]; then
     echo "Could not create job temp dir ${jobTmpDir}"
     exit 1
 fi
+
+# Optionally trim neck of input
+if [[ $trimNeck -gt 0 ]]; then
+  echo "Preprocessing: Trim neck from T1w image"
+  ${scriptDir}/trim_neck.sh -d -c 10 -w $jobTmpDir $inputT1w ${outputDir}/${inputT1wBasename}
+  echo "Preprocessing: Done!"
+else
+  cp $inputT1w ${outputDir}/${inputT1wBasename}
+fi
+
+if [[ -f ${inputT2w} ]]; then
+    cp $inputT2w ${outputDir}/${inputT2wBasename}
+fi
+
 
 # perform MTL segmentation
 echo "Step 1/3: Performing medial temporal lobe segmentation"
@@ -326,7 +352,7 @@ echo "Step 3/3: Reorganize output and summarize the result"
 Summarize
 echo "Step 3/3: Done!"
 
-if [[ $cleanup -eq 1 ]]; then
+if [[ $cleanup -gt 0 ]]; then
   rm -f ${jobTmpDir}/MTLSeg ${jobTmpDir}/ICVSeg
   rmdir ${jobTmpDir}
 else
