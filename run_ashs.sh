@@ -189,7 +189,7 @@ function options()
   inputT1wDirname=$(dirname "$inputT1w")
 
   # Trim neck can change input, so don't allow input directory to be output directory
-  if [[ "${outputDir}" -eq "${inputT1wDirname}" ]]; then
+  if [[ "${outputDir}" == "${inputT1wDirname}" ]]; then
     echo "Output directory cannot be the same as the input directory"
     exit 1
   fi
@@ -333,7 +333,10 @@ fi
 # Optionally trim neck of input
 if [[ $trimNeck -gt 0 ]]; then
   echo "Preprocessing: Trim neck from T1w image"
-  ${scriptDir}/trim_neck.sh -d -c 10 -w $jobTmpDir $inputT1w ${outputDir}/${inputT1wBasename}
+
+  mkdir ${jobTmpDir}/neckTrim
+
+  ${scriptDir}/trim_neck.sh -d -c 10 -w ${jobTmpDir}/neckTrim $inputT1w ${outputDir}/${inputT1wBasename}
   echo "Preprocessing: Done!"
 else
   cp $inputT1w ${outputDir}/${inputT1wBasename}
@@ -360,7 +363,7 @@ Summarize
 echo "Step 3/3: Done!"
 
 if [[ $cleanup -gt 0 ]]; then
-  rm -rf ${jobTmpDir}/MTLSeg ${jobTmpDir}/ICVSeg
+  rm -rf ${jobTmpDir}/MTLSeg ${jobTmpDir}/ICVSeg ${jobTmpDir}/neckTrim
   rmdir ${jobTmpDir}
 else
   echo "Not cleaning up working directory ${jobTmpDir}"
