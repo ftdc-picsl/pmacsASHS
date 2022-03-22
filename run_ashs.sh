@@ -47,7 +47,7 @@ function usage()
 {
     echo "
     $0 -g <t1w> -o <output dir> [-f <temporal lobe T2w>] [-l <(0)|1>] [-c <(1)|0>] [-m <t2w to t1w transform>]
-       [-I <ICV atlas>] [-M <MTL T2w atlas>] [-T <MTL T1w atlas>]
+       [-t <(1)/0>] [-I <ICV atlas>] [-M <MTL T2w atlas>] [-T <MTL T1w atlas>]
 
     $0 -h for extended help.
     "
