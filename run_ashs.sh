@@ -95,7 +95,8 @@ function help()
            The T2w and T1w images should be in the same physical space. This can be verified by loading both into
            ITK-SNAP. See the ASHS website for more details.
 
-      -l : Parallel execution with LSF (default = $submitToQueue).
+      -l : Parallel execution with LSF (default = $submitToQueue), for faster segmentation of a single session. If
+           processing many sessions, it's more efficient to run without this option.
 
       -m : Affine transform aligning MTL to T1w. By default, this is computed
            automatically. Use this option to use a pre-defined transform instead. The transform should be computed
@@ -219,7 +220,7 @@ function options()
 function MTLSeg()
 {
   # If no T2w, use T1w for both inputs
-  segT2w=$inputT1w
+  segT2w=$segT1w
   segAtlas=$mtlT1wAtlas
 
   mtlOutputFileRoot=$inputT1wFileRoot
@@ -243,7 +244,7 @@ function MTLSeg()
   fi
 
   ${ASHS_ROOT}/bin/ashs_main.sh \
-    -a $segAtlas -d -T -I $mtlOutputFileRoot -g $inputT1w \
+    -a $segAtlas -d -T -I $mtlOutputFileRoot -g $segT1w \
     -f $segT2w \
     -s 1-7 \
     -t ${greedyThreads} \
@@ -260,8 +261,8 @@ function ICVSeg()
   fi
 
   ${ASHS_ROOT}/bin/ashs_main.sh \
-    -a $icvAtlas -d -T -I $inputT1wFileRoot -g $inputT1w \
-    -f $inputT1w \
+    -a $icvAtlas -d -T -I $inputT1wFileRoot -g $segT1w \
+    -f $segT1w \
     -s 1-7 \
     -B \
     -t ${greedyThreads} \
@@ -308,8 +309,8 @@ options $@
 
 # Check we're in a bsub job
 if [[ -z "${LSB_DJOB_NUMPROC}" ]]; then
-    echo "Script must be run from within an LSB job"
-    exit 1
+  echo "Script must be run from within an LSB job"
+  exit 1
 fi
 
 if [[ $submitToQueue -eq 0 ]]; then
@@ -326,9 +327,12 @@ mkdir -p ${outputDir}
 jobTmpDir=$( mktemp -d -p /scratch ashs.${LSB_JOBID}.XXXXXXX.tmpdir )
 
 if [[ ! -d "$jobTmpDir" ]]; then
-    echo "Could not create job temp dir ${jobTmpDir}"
-    exit 1
+  echo "Could not create job temp dir ${jobTmpDir}"
+  exit 1
 fi
+
+# This is what gets used in the segmentation calls
+segT1w=${outputDir}/${inputT1wBasename}
 
 # Optionally trim neck of input
 if [[ $trimNeck -gt 0 ]]; then
@@ -336,16 +340,15 @@ if [[ $trimNeck -gt 0 ]]; then
 
   mkdir ${jobTmpDir}/neckTrim
 
-  ${scriptDir}/trim_neck.sh -d -c 10 -w ${jobTmpDir}/neckTrim $inputT1w ${outputDir}/${inputT1wBasename}
+  ${scriptDir}/trim_neck.sh -d -c 10 -w ${jobTmpDir}/neckTrim $inputT1w ${segT1w}
   echo "Preprocessing: Done!"
 else
-  cp $inputT1w ${outputDir}/${inputT1wBasename}
+  cp $inputT1w ${segT1w}
 fi
 
 if [[ -f ${inputT2w} ]]; then
-    cp $inputT2w ${outputDir}/${inputT2wBasename}
+  cp $inputT2w ${outputDir}/${inputT2wBasename}
 fi
-
 
 # perform MTL segmentation
 echo "Step 1/3: Performing medial temporal lobe segmentation"
