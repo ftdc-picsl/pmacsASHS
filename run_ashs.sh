@@ -1,5 +1,8 @@
 #!/bin/bash -e
 
+# cleanup tmp dir
+cleanupTmp=1
+
 module load c3d/20191022
 module load ashs
 
@@ -34,9 +37,6 @@ submitToQueue=0
 
 # Leave at 1 if submitting jobs, otherwise set to num procs
 greedyThreads=1
-
-# cleanup tmp dir
-cleanup=1
 
 # trim neck
 trimNeck=1
@@ -85,7 +85,7 @@ function help()
 
     Options:
 
-      -c : Cleanup working directory (default = $cleanup).
+      -c : Cleanup working directory (default = $cleanupTmp).
 
       -f : T2w MTL image. This is a specialized image, described in the ASHS documentation as: \"oblique coronal,
            oriented along the main axis of the hippocampus. It should have high in-plane resolution (0.4mmx0.4mm)
@@ -157,7 +157,7 @@ function options()
       F) mtlT2wAtlas=$(readlink -m "$OPTARG");;
       G) mtlT1wAtlas=$(readlink -m "$OPTARG");;
       I) icvAtlas=$(readlink -m "$OPTARG");;
-      c) cleanup=$OPTARG;;
+      c) cleanupTmp=$OPTARG;;
       f) inputT2w=$(readlink -m "$OPTARG");;
       g) inputT1w=$(readlink -m "$OPTARG");;
       l) submitToQueue=$OPTARG;;
@@ -331,6 +331,38 @@ if [[ ! -d "$jobTmpDir" ]]; then
   exit 1
 fi
 
+# function to clean up tmp and report errors at exit
+function cleanup {
+  EXIT_CODE=$?
+  LAST_CMD=${BASH_COMMAND}
+  set +e # disable termination on error
+
+  if [[ $cleanupTmp -gt 0 ]]; then
+    rm -rf ${jobTmpDir}/MTLSeg ${jobTmpDir}/ICVSeg ${jobTmpDir}/neckTrim
+    rmdir ${jobTmpDir}
+  else
+    echo "Leaving working directory ${jobTmpDir}"
+  fi
+
+  if [[ ${EXIT_CODE} -gt 0 ]]; then
+    echo "
+$0 EXITED ON ERROR - PROCESSING MAY BE INCOMPLETE"
+    echo "
+The command \"${LAST_CMD}\" exited with code ${EXIT_CODE}
+"
+  fi
+
+  exit $EXIT_CODE
+}
+
+trap cleanup EXIT
+
+function sigintCleanup {
+   exit $?
+}
+
+trap sigintCleanup SIGINT
+
 # This is what gets used in the segmentation calls
 segT1w=${outputDir}/${inputT1wBasename}
 
@@ -364,10 +396,3 @@ echo "Step 2/3: Done!"
 echo "Step 3/3: Reorganize output and summarize the result"
 Summarize
 echo "Step 3/3: Done!"
-
-if [[ $cleanup -gt 0 ]]; then
-  rm -rf ${jobTmpDir}/MTLSeg ${jobTmpDir}/ICVSeg ${jobTmpDir}/neckTrim
-  rmdir ${jobTmpDir}
-else
-  echo "Not cleaning up working directory ${jobTmpDir}"
-fi

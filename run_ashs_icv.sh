@@ -28,7 +28,7 @@ submitToQueue=0
 greedyThreads=1
 
 # cleanup tmp dir
-cleanup=1
+cleanupTmp=1
 
 # trim neck
 trimNeck=1
@@ -61,7 +61,7 @@ function help()
 
     Options:
 
-      -c : Cleanup working directory (default = $cleanup).
+      -c : Cleanup working directory (default = $cleanupTmp).
 
       -l : Parallel execution with LSF (default = $submitToQueue), for faster segmentation of a single session. If
            processing many sessions, it's more efficient to run without this option.
@@ -101,7 +101,7 @@ function options()
   while getopts "I:c:g:l:o:t:h" opt; do
     case $opt in
       I) icvAtlas=$(readlink -m "$OPTARG");;
-      c) cleanup=$OPTARG;;
+      c) cleanupTmp=$OPTARG;;
       g) inputT1w=$(readlink -m "$OPTARG");;
       l) submitToQueue=$OPTARG;;
       o) outputDir=$(readlink -m "$OPTARG");;
@@ -193,6 +193,38 @@ if [[ ! -d "$jobTmpDir" ]]; then
     exit 1
 fi
 
+# function to clean up tmp and report errors
+function cleanup {
+  EXIT_CODE=$?
+  LAST_CMD=${BASH_COMMAND}
+  set +e # disable termination on error
+
+  if [[ $cleanupTmp -gt 0 ]]; then
+    rm -rf ${jobTmpDir}/MTLSeg ${jobTmpDir}/ICVSeg ${jobTmpDir}/neckTrim
+    rmdir ${jobTmpDir}
+  else
+    echo "Leaving working directory ${jobTmpDir}"
+  fi
+
+  if [[ ${EXIT_CODE} -gt 0 ]]; then
+    echo "
+$0 EXITED ON ERROR - PROCESSING MAY BE INCOMPLETE"
+    echo "
+The command \"${LAST_CMD}\" exited with code ${EXIT_CODE}
+"
+  fi
+
+  exit $EXIT_CODE
+}
+
+trap cleanup EXIT
+
+function sigintCleanup {
+   exit $?
+}
+
+trap sigintCleanup SIGINT
+
 # This is what gets used in the segmentation call
 segT1w=${outputDir}/${inputT1wBasename}
 
@@ -217,10 +249,3 @@ echo "Step 1/2: Done!"
 echo "Step 2/2: Reorganize output and summarize the result"
 Summarize
 echo "Step 2/2: Done!"
-
-if [[ $cleanup -gt 0 ]]; then
-  rm -rf ${jobTmpDir}/ICVSeg ${jobTmpDir}/neckTrim
-  rmdir ${jobTmpDir}
-else
-  echo "Not cleaning up working directory ${jobTmpDir}"
-fi
