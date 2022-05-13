@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 module load c3d/20191022
-module load ashs
+module load ashs/2.0.0
 
 scriptPath=$(readlink -e "$0")
 scriptDir=$(dirname "${scriptPath}")

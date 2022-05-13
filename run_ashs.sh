@@ -4,16 +4,17 @@
 cleanupTmp=1
 
 module load c3d/20191022
-module load ashs
+module load ashs/2.0.0
 
 scriptPath=$(readlink -e "$0")
 scriptDir=$(dirname "${scriptPath}")
 
 # Default atlases
-mtlT1wAtlas="${ASHS_ROOT}/atlases/MTL_3TT1MRI_PMC_atlas"
-mtlT2wAtlas="${ASHS_ROOT}/atlases/MTL_3TT2MRI_ABC_prisma_atlas"
+defaultMTLT1wAtlas="${ASHS_ROOT}/atlases/MTL_3TT1MRI_PMC_atlas"
+defaultHighResMTLT2wAtlas="${ASHS_ROOT}/atlases/MTL_3TT2MRI_ABC_prisma_atlas"
+defaultLowResMTLT2wAtlas="${ASHS_ROOT}/atlases/MTL_3TT2MRI_PMC_trio_atlas"
 # ICV always done on T1w
-icvAtlas="${ASHS_ROOT}/atlases/ICV_3TT1MRI_atlas"
+defaultICVAtlas="${ASHS_ROOT}/atlases/ICV_3TT1MRI_atlas"
 
 if [[ ! -f "${ASHS_ROOT}/bin/ashs_main.sh" ]]; then
   echo "Cannot locate ASHS executables at ${ASHS_ROOT}/bin"
@@ -31,6 +32,11 @@ inputT2wDirname=""
 inputT2wFileRoot=""
 outputDir=""
 inputTransform=""
+
+# The actual atlases we use, set to defaults if not passed on the command line
+mtlT1wAtlas=""
+mtlT2wAtlas=""
+icvAtlas=""
 
 # Submit to queue, if 1 call ashs_main with -l
 submitToQueue=0
@@ -64,7 +70,7 @@ function help()
 
     Before running ASHS, check that your data is correctly formatted, see
 
-    https://sites.google.com/site/hipposubfields/tutorial
+    https://sites.google.com/view/ashs-dox/mri-data
 
     The stages in this script are:
 
@@ -107,16 +113,20 @@ function help()
 
     Custom atlas options:
 
-      -F : MTL T2w atlas (default = $mtlT2wAtlas).
-      -G : MTL T1w atlas (default = $mtlT1wAtlas).
+      -F : MTL T2w atlas. If not specified, a T2w atlas will be chosen at run time based on the slice thickness of
+           the input T2w:
+             High resolution (slices <= 1.5mm): $defaultHighResMTLT2wAtlas
+             Low resolution (slice > 1.5mm): $defaultLowResMTLT2wAtlas
+
+      -G : MTL T1w atlas (default = $defaultMTLT1wAtlas).
+
       -I : T1w atlas for ICV estimation (default = $icvAtlas).
 
-      The default atlases are defined on 3T data from the Penn Memory Center. You may use custom atlases for other
-      data sets. See the ASHS website for details of atlas construction.
+      See the ASHS website for details of atlas construction.
 
       The atlas label definitions, in ITK-SNAP format, are in
 
-        atlas_dir/snap
+        ${ASHS_ROOT}/atlases/<atlas_name>/snap
 
 
     Referencing:
@@ -140,7 +150,7 @@ function help()
 
       This script is written by Philip Cook and Long Xie.
 
-      ASHS website: https://sites.google.com/site/hipposubfields/
+      ASHS website: https://sites.google.com/view/ashs-dox/home
     "
 }
 
@@ -215,6 +225,53 @@ function options()
     fi
   fi
 
+  # Now check atlases - if command line options not used, then
+  # set defaults
+  if [[ -z "$mtlT1wAtlas" ]]; then
+    mtlT1wAtlas=$defaultMTLT1wAtlas
+  fi
+
+  if [[ -z "mtlT2wAtlas" ]]; then
+    if [[ -f "$inputT2w" ]]; then
+      # Use resolution of T2w scan to choose atlas
+      t2wSliceThickness=`c3d $inputT2w -info-full | grep "pixdim\[3\]"`
+      highRes=`echo "$t2wSliceThickness > 1.5" | bc`
+      if [[ $highRes -gt 0 ]]; then
+        mtlT2wAtlas=$defaultHighResMTLT2wAtlas
+      else
+        mtlT2wAtlas=$defaultLowResMTLT2wAtlas
+      fi
+    else
+      # Don't actually need this but set default anyway
+      mtlT2wAtlas=$defaultHighResMTLT2wAtlas
+    fi
+  fi
+
+  if [[ -z "$icvAtlas" ]]; then
+    # ICV always done on T1w
+    icvAtlas=$defaultICVAtlas
+  fi
+
+
+}
+
+function printOptions()
+{
+  echo "
+-------------- ASHS input --------------
+  Volumetric T1w     : $inputT1w
+  MTL T2w            : $inputT2w
+  ASHS_ROOT          : $ASHS_ROOT
+  MTL T1w atlas      : $mtlT1wAtlas
+  MTL T2w atlas      : $mtlT2wAtlas
+  ICV T1w atlas      : $icvAtlas
+  Trim T1w neck      : $trimNeck
+  MTL->T1w transform : $inputTransform
+  greedy threads     : $greedyThreads
+  parallel           : $submitToQueue
+----------------------------------------
+
+"
 }
 
 function MTLSeg()
@@ -357,6 +414,7 @@ The command \"${LAST_CMD}\" exited with code ${EXIT_CODE}
 
 trap cleanup EXIT
 
+# Exits, triggering cleanup, on CTRL+C
 function sigintCleanup {
    exit $?
 }
@@ -381,6 +439,9 @@ fi
 if [[ -f ${inputT2w} ]]; then
   cp $inputT2w ${outputDir}/${inputT2wBasename}
 fi
+
+# Print a summary of options for this segmentation
+printOptions
 
 # perform MTL segmentation
 echo "Step 1/3: Performing medial temporal lobe segmentation"
