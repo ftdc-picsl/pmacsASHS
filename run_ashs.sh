@@ -162,7 +162,7 @@ function options()
     exit 1
   fi
 
-  while getopts "I:M:T:c:f:g:l:m:o:t:h" opt; do
+  while getopts "F:G:I:c:f:g:l:m:o:t:h" opt; do
     case $opt in
       F) mtlT2wAtlas=$(readlink -m "$OPTARG");;
       G) mtlT1wAtlas=$(readlink -m "$OPTARG");;
@@ -231,12 +231,12 @@ function options()
     mtlT1wAtlas=$defaultMTLT1wAtlas
   fi
 
-  if [[ -z "mtlT2wAtlas" ]]; then
+  if [[ -z "$mtlT2wAtlas" ]]; then
     if [[ -f "$inputT2w" ]]; then
       # Use resolution of T2w scan to choose atlas
       t2wSliceThickness=`c3d $inputT2w -info-full | grep "pixdim\[3\]"`
       highRes=`echo "$t2wSliceThickness > 1.5" | bc`
-      if [[ $highRes -gt 0 ]]; then
+      if [[ $highRes -eq 0 ]]; then
         mtlT2wAtlas=$defaultHighResMTLT2wAtlas
       else
         mtlT2wAtlas=$defaultLowResMTLT2wAtlas
@@ -421,6 +421,9 @@ function sigintCleanup {
 
 trap sigintCleanup SIGINT
 
+# Print a summary of options for this segmentation
+printOptions
+
 # This is what gets used in the segmentation calls
 segT1w=${outputDir}/${inputT1wBasename}
 
@@ -439,9 +442,6 @@ fi
 if [[ -f ${inputT2w} ]]; then
   cp $inputT2w ${outputDir}/${inputT2wBasename}
 fi
-
-# Print a summary of options for this segmentation
-printOptions
 
 # perform MTL segmentation
 echo "Step 1/3: Performing medial temporal lobe segmentation"
